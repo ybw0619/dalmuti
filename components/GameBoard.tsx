@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Game, Card as CardType } from '@/types/game';
 import { Card } from './Card';
 
@@ -62,6 +62,20 @@ export function GameBoard({ game, currentPlayerId, onPlayCards, onPass }: GameBo
     onPass();
     setSelectedCards(new Set());
   };
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.code === 'Space') {
+        e.preventDefault();
+        if (isMyTurn && !currentPlayer?.hasFinished) {
+          handlePass();
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isMyTurn, currentPlayer?.hasFinished, onPass]);
 
   if (!currentPlayer) return null;
 
@@ -260,9 +274,12 @@ export function GameBoard({ game, currentPlayerId, onPlayCards, onPass }: GameBo
               </button>
               <button
                 onClick={handlePass}
-                className='bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-700 hover:to-rose-700 text-white font-bold py-2 sm:py-3 px-4 sm:px-8 rounded-xl text-sm sm:text-base transition-all shadow-lg active:scale-95'
+                className='bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-700 hover:to-rose-700 text-white font-bold py-2 sm:py-3 px-4 sm:px-8 rounded-xl text-sm sm:text-base transition-all shadow-lg active:scale-95 flex items-center gap-2'
               >
-                ✋ 패스
+                <span>✋ 패스</span>
+                <kbd className='hidden md:flex items-center gap-1 font-sans text-[10px] bg-black/20 px-1.5 py-0.5 rounded border-b-2 border-black/30 text-white/90 uppercase tracking-wider'>
+                  Space
+                </kbd>
               </button>
             </div>
           )}
