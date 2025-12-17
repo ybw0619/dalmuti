@@ -44,23 +44,63 @@ export function GameBoard({ game, currentPlayerId, onPlayCards, onPass }: GameBo
     if (!isMyTurn || currentPlayer?.hasFinished) return;
 
     const clickedCard = currentPlayer?.cards.find((c) => c.id === cardId);
-    if (!clickedCard) return;
+    if (!clickedCard || !currentPlayer) return;
 
+    // 필드에 카드가 있는 경우 (이어내기) - 자동 다중 선택
+    if (game.currentTurn && game.currentTurn.cards.length > 0) {
+      // 이미 선택된 카드라면 전체 선택 해제
+      if (selectedCards.has(cardId)) {
+        setSelectedCards(new Set());
+        return;
+      }
+
+      const requiredCount = game.currentTurn.cards.length;
+      const cardsToSelect = new Set<string>();
+
+      // 클릭한 카드 우선 추가
+      cardsToSelect.add(cardId);
+
+      // 1. 같은 랭크의 다른 카드들 찾기
+      const sameRankCards = currentPlayer.cards.filter(
+        (c) => c.rank === clickedCard.rank && c.id !== cardId
+      );
+
+      for (const card of sameRankCards) {
+        if (cardsToSelect.size < requiredCount) {
+          cardsToSelect.add(card.id);
+        } else {
+          break;
+        }
+      }
+
+      // 2. 부족하면 조커로 채우기 (클릭한 카드가 조커가 아닐 때)
+      if (clickedCard.rank !== 'joker' && cardsToSelect.size < requiredCount) {
+        const jokerCards = currentPlayer.cards.filter(
+          (c) => c.rank === 'joker' && !cardsToSelect.has(c.id)
+        );
+        for (const card of jokerCards) {
+          if (cardsToSelect.size < requiredCount) {
+            cardsToSelect.add(card.id);
+          } else {
+            break;
+          }
+        }
+      }
+
+      // 필요한 개수만큼 채워졌을 때만 선택 적용
+      if (cardsToSelect.size === requiredCount) {
+        setSelectedCards(cardsToSelect);
+      }
+      return;
+    }
+
+    // 필드에 카드가 없는 경우 (선플레이) - 기존처럼 하나씩 선택/해제
     setSelectedCards((prev) => {
       const newSet = new Set(prev);
 
       if (newSet.has(cardId)) {
         newSet.delete(cardId);
       } else {
-        // 필드에 카드가 있는 경우 개수 제한 체크
-        if (
-          game.currentTurn &&
-          game.currentTurn.cards.length > 0 &&
-          newSet.size >= game.currentTurn.cards.length
-        ) {
-          return newSet;
-        }
-
         if (newSet.size === 0) {
           newSet.add(cardId);
         } else {
