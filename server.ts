@@ -9,9 +9,12 @@ const roomManager = new RoomManager();
 const aiPlayers = new Map<string, AIPlayer>();
 
 export function setupSocketServer(httpServer: ReturnType<typeof createServer>) {
+  const hostname = process.env.SERVER_HOST || 'localhost';
+  const port = process.env.PORT || '3456';
+
   const io = new Server<ClientToServerEvents, ServerToClientEvents>(httpServer, {
     cors: {
-      origin: process.env.NODE_ENV === 'production' ? false : ['http://localhost:3000'],
+      origin: process.env.NODE_ENV === 'production' ? false : [`http://${hostname}:${port}`],
       credentials: true,
     },
   });
@@ -38,7 +41,7 @@ export function setupSocketServer(httpServer: ReturnType<typeof createServer>) {
         socket.join(roomId);
         callback(room);
         io.to(roomId).emit('room:updated', room);
-        io.to(roomId).emit('player:joined', room.players.find(p => p.id === socket.id)!);
+        io.to(roomId).emit('player:joined', room.players.find((p) => p.id === socket.id)!);
       } catch (error) {
         socket.emit('error', (error as Error).message);
       }
@@ -123,7 +126,7 @@ export function setupSocketServer(httpServer: ReturnType<typeof createServer>) {
         // 세금 단계 시작
         if (game.phase === 'tax') {
           const taxRequests = calculateTaxRequests(game.players);
-          taxRequests.forEach(req => {
+          taxRequests.forEach((req) => {
             io.to(req.fromPlayerId).emit('tax:request', req);
           });
         }
@@ -160,11 +163,14 @@ export function setupSocketServer(httpServer: ReturnType<typeof createServer>) {
         io.to(room.id).emit('game:updated', updatedGame);
 
         if (updatedGame.phase === 'finished') {
-          io.to(room.id).emit('game:finished', updatedGame.players.map((p, i) => ({
-            playerId: p.id,
-            playerName: p.name,
-            position: p.finishOrder || updatedGame.players.length,
-          })));
+          io.to(room.id).emit(
+            'game:finished',
+            updatedGame.players.map((p, i) => ({
+              playerId: p.id,
+              playerName: p.name,
+              position: p.finishOrder || updatedGame.players.length,
+            }))
+          );
         } else {
           // AI 차례 처리
           setTimeout(() => processAITurn(room.id), 1000);
@@ -242,11 +248,14 @@ export function setupSocketServer(httpServer: ReturnType<typeof createServer>) {
       io.to(roomId).emit('game:updated', updatedGame);
 
       if (updatedGame.phase === 'finished') {
-        io.to(roomId).emit('game:finished', updatedGame.players.map((p, i) => ({
-          playerId: p.id,
-          playerName: p.name,
-          position: p.finishOrder || updatedGame.players.length,
-        })));
+        io.to(roomId).emit(
+          'game:finished',
+          updatedGame.players.map((p, i) => ({
+            playerId: p.id,
+            playerName: p.name,
+            position: p.finishOrder || updatedGame.players.length,
+          }))
+        );
       } else {
         // 다음 AI 차례면 계속 처리
         setTimeout(() => processAITurn(roomId), 1000);

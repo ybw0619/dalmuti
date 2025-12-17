@@ -7,7 +7,8 @@ let socket: Socket<ServerToClientEvents, ClientToServerEvents> | null = null;
 
 export function getSocket(): Socket<ServerToClientEvents, ClientToServerEvents> {
   if (!socket) {
-    socket = io('http://localhost:3000', {
+    const serverUrl = process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:3456';
+    socket = io(serverUrl, {
       autoConnect: true,
     });
   }
