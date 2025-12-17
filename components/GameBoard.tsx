@@ -95,14 +95,28 @@ export function GameBoard({ game, room, currentPlayerId, onPlayCards, onPass, on
         }
       }
 
-      // 필요한 개수만큼 채워졌을 때만 선택 적용
-      if (cardsToSelect.size === requiredCount) {
-        setSelectedCards(cardsToSelect);
-      }
+      // 가능한 만큼 자동 선택 (개수가 부족해도 선택됨)
+      setSelectedCards(cardsToSelect);
       return;
     }
 
-    // 필드에 카드가 없는 경우 (선플레이) - 기존처럼 하나씩 선택/해제
+    // 필드에 카드가 없는 경우 (선플레이)
+    
+    // 선택된 카드가 없는 경우 - 해당 랭크의 모든 카드 자동 선택
+    if (selectedCards.size === 0) {
+      const newSet = new Set<string>();
+      newSet.add(cardId);
+      
+      const sameRankCards = currentPlayer.cards.filter(
+        (c) => c.rank === clickedCard.rank && c.id !== cardId
+      );
+      
+      sameRankCards.forEach((c) => newSet.add(c.id));
+      setSelectedCards(newSet);
+      return;
+    }
+
+    // 기존처럼 하나씩 선택/해제
     setSelectedCards((prev) => {
       const newSet = new Set(prev);
 
