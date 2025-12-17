@@ -24,6 +24,7 @@ export interface Player {
 export interface GameOptions {
   enableRevolution: boolean; // 혁명 규칙 사용 여부
   enableTax: boolean; // 세금 규칙 사용 여부
+  turnTimeLimit?: number; // 턴 제한 시간 (초), undefined면 무제한
 }
 
 // 게임 방
@@ -63,6 +64,7 @@ export interface Game {
   taxPhaseComplete: boolean;
   finishedPlayers: string[]; // 끝난 플레이어 ID 목록
   gameOptions: GameOptions; // 게임 옵션
+  turnStartTime?: number; // 현재 턴 시작 시각 (timestamp)
 }
 
 // Socket 이벤트 타입

@@ -57,30 +57,64 @@ export function WaitingRoom({
                 게임 규칙
               </h3>
               {isHost ? (
-                <div className="flex flex-col sm:flex-row gap-3 sm:gap-6">
-                  <label className="flex items-center gap-2 text-white cursor-pointer hover:text-yellow-300 transition-colors">
-                    <input
-                      type="checkbox"
-                      checked={room.gameOptions.enableRevolution}
-                      onChange={(e) => onUpdateOptions({ ...room.gameOptions, enableRevolution: e.target.checked })}
-                      className="w-5 h-5 cursor-pointer accent-purple-500"
-                    />
-                    <span className="text-sm sm:text-base">🔄 혁명 규칙 (8장 이상)</span>
-                  </label>
-                  <label className="flex items-center gap-2 text-white cursor-pointer hover:text-yellow-300 transition-colors">
-                    <input
-                      type="checkbox"
-                      checked={room.gameOptions.enableTax}
-                      onChange={(e) => onUpdateOptions({ ...room.gameOptions, enableTax: e.target.checked })}
-                      className="w-5 h-5 cursor-pointer accent-purple-500"
-                    />
-                    <span className="text-sm sm:text-base">💰 세금 규칙</span>
-                  </label>
+                <div className="space-y-3">
+                  <div className="flex flex-col sm:flex-row gap-3 sm:gap-6">
+                    <label className="flex items-center gap-2 text-white cursor-pointer hover:text-yellow-300 transition-colors">
+                      <input
+                        type="checkbox"
+                        checked={room.gameOptions.enableRevolution}
+                        onChange={(e) => onUpdateOptions({ ...room.gameOptions, enableRevolution: e.target.checked })}
+                        className="w-5 h-5 cursor-pointer accent-purple-500"
+                      />
+                      <span className="text-sm sm:text-base">🔄 혁명 규칙 (8장 이상)</span>
+                    </label>
+                    <label className="flex items-center gap-2 text-white cursor-pointer hover:text-yellow-300 transition-colors">
+                      <input
+                        type="checkbox"
+                        checked={room.gameOptions.enableTax}
+                        onChange={(e) => onUpdateOptions({ ...room.gameOptions, enableTax: e.target.checked })}
+                        className="w-5 h-5 cursor-pointer accent-purple-500"
+                      />
+                      <span className="text-sm sm:text-base">💰 세금 규칙</span>
+                    </label>
+                  </div>
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
+                    <label className="text-white text-sm sm:text-base flex items-center gap-2">
+                      <span>⏱️ 턴 제한 시간:</span>
+                    </label>
+                    <select
+                      value={room.gameOptions.turnTimeLimit || 0}
+                      onChange={(e) => {
+                        const value = parseInt(e.target.value);
+                        onUpdateOptions({
+                          ...room.gameOptions,
+                          turnTimeLimit: value === 0 ? undefined : value
+                        });
+                      }}
+                      className="bg-white/20 text-white px-3 py-1.5 rounded-lg cursor-pointer hover:bg-white/30 transition-colors text-sm sm:text-base border border-white/20 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    >
+                      <option value="0" className="bg-purple-900">무제한</option>
+                      <option value="10" className="bg-purple-900">10초</option>
+                      <option value="15" className="bg-purple-900">15초</option>
+                      <option value="20" className="bg-purple-900">20초</option>
+                      <option value="25" className="bg-purple-900">25초</option>
+                      <option value="30" className="bg-purple-900">30초</option>
+                      <option value="35" className="bg-purple-900">35초</option>
+                      <option value="40" className="bg-purple-900">40초</option>
+                      <option value="45" className="bg-purple-900">45초</option>
+                      <option value="50" className="bg-purple-900">50초</option>
+                      <option value="55" className="bg-purple-900">55초</option>
+                      <option value="60" className="bg-purple-900">60초</option>
+                    </select>
+                  </div>
                 </div>
               ) : (
-                <div className="flex flex-col sm:flex-row gap-3 sm:gap-6 text-white/80 text-sm sm:text-base">
-                  <span>🔄 혁명 규칙: {room.gameOptions.enableRevolution ? '✅ 켜짐' : '❌ 꺼짐'}</span>
-                  <span>💰 세금 규칙: {room.gameOptions.enableTax ? '✅ 켜짐' : '❌ 꺼짐'}</span>
+                <div className="flex flex-col gap-2 text-white/80 text-sm sm:text-base">
+                  <div className="flex flex-col sm:flex-row gap-3 sm:gap-6">
+                    <span>🔄 혁명 규칙: {room.gameOptions.enableRevolution ? '✅ 켜짐' : '❌ 꺼짐'}</span>
+                    <span>💰 세금 규칙: {room.gameOptions.enableTax ? '✅ 켜짐' : '❌ 꺼짐'}</span>
+                  </div>
+                  <span>⏱️ 턴 제한 시간: {room.gameOptions.turnTimeLimit ? `${room.gameOptions.turnTimeLimit}초` : '무제한'}</span>
                 </div>
               )}
             </div>

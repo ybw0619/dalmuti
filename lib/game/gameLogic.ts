@@ -26,6 +26,7 @@ export function createGame(players: Player[], roomId: string, gameOptions: GameO
     taxPhaseComplete: !gameOptions.enableTax, // 세금 규칙이 꺼져있으면 바로 완료
     finishedPlayers: [],
     gameOptions,
+    turnStartTime: gameOptions.turnTimeLimit ? Date.now() : undefined,
   };
 }
 
@@ -159,6 +160,7 @@ export function playCards(game: Game, playerId: string, cards: Card[]): Game {
     isRevolution,
     finishedPlayers,
     phase: checkGameFinished(updatedPlayers) ? 'finished' : 'playing',
+    turnStartTime: game.gameOptions.turnTimeLimit ? Date.now() : undefined,
   };
 }
 
@@ -188,6 +190,7 @@ export function passPlay(game: Game, playerId: string): Game {
     currentPlayerIndex: nextPlayerIndex,
     passCount: shouldResetTurn ? 0 : newPassCount,
     currentTurn: shouldResetTurn ? null : game.currentTurn,
+    turnStartTime: game.gameOptions.turnTimeLimit ? Date.now() : undefined,
   };
 }
 

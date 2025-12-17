@@ -7,6 +7,7 @@ import type { ServerToClientEvents, ClientToServerEvents } from './types/game';
 
 const roomManager = new RoomManager();
 const aiPlayers = new Map<string, AIPlayer>();
+const turnTimers = new Map<string, NodeJS.Timeout>(); // roomId -> timer
 
 export function setupSocketServer(httpServer: ReturnType<typeof createServer>) {
   const hostname = process.env.SERVER_HOST || 'localhost';
@@ -131,8 +132,15 @@ export function setupSocketServer(httpServer: ReturnType<typeof createServer>) {
           });
         }
 
-        // AI 차례면 자동 플레이
-        setTimeout(() => processAITurn(room.id), 1000);
+        // 턴 타이머 시작 (플레잉 단계이고 현재 플레이어가 AI가 아니면)
+        if (game.phase === 'playing') {
+          const currentPlayer = game.players[game.currentPlayerIndex];
+          if (currentPlayer.type === 'ai') {
+            setTimeout(() => processAITurn(room.id), 1000);
+          } else {
+            startTurnTimer(room.id);
+          }
+        }
       } catch (error) {
         socket.emit('error', (error as Error).message);
       }
@@ -163,6 +171,7 @@ export function setupSocketServer(httpServer: ReturnType<typeof createServer>) {
         io.to(room.id).emit('game:updated', updatedGame);
 
         if (updatedGame.phase === 'finished') {
+          clearTurnTimer(room.id);
           io.to(room.id).emit(
             'game:finished',
             updatedGame.players.map((p, i) => ({
@@ -172,8 +181,13 @@ export function setupSocketServer(httpServer: ReturnType<typeof createServer>) {
             }))
           );
         } else {
-          // AI 차례 처리
-          setTimeout(() => processAITurn(room.id), 1000);
+          // 다음 턴 처리
+          const nextPlayer = updatedGame.players[updatedGame.currentPlayerIndex];
+          if (nextPlayer.type === 'ai') {
+            setTimeout(() => processAITurn(room.id), 1000);
+          } else {
+            startTurnTimer(room.id);
+          }
         }
       } catch (error) {
         socket.emit('error', (error as Error).message);
@@ -194,8 +208,13 @@ export function setupSocketServer(httpServer: ReturnType<typeof createServer>) {
 
         io.to(room.id).emit('game:updated', updatedGame);
 
-        // AI 차례 처리
-        setTimeout(() => processAITurn(room.id), 1000);
+        // 다음 턴 처리
+        const nextPlayer = updatedGame.players[updatedGame.currentPlayerIndex];
+        if (nextPlayer.type === 'ai') {
+          setTimeout(() => processAITurn(room.id), 1000);
+        } else {
+          startTurnTimer(room.id);
+        }
       } catch (error) {
         socket.emit('error', (error as Error).message);
       }
@@ -206,6 +225,7 @@ export function setupSocketServer(httpServer: ReturnType<typeof createServer>) {
       console.log('클라이언트 연결 해제:', socket.id);
       const room = roomManager.findRoomByPlayer(socket.id);
       if (room) {
+        clearTurnTimer(room.id);
         const updatedRoom = roomManager.leaveRoom(room.id, socket.id);
         if (updatedRoom) {
           io.to(room.id).emit('room:updated', updatedRoom);
@@ -214,6 +234,73 @@ export function setupSocketServer(httpServer: ReturnType<typeof createServer>) {
       }
     });
   });
+
+  // 턴 타이머 설정
+  function startTurnTimer(roomId: string) {
+    // 기존 타이머 제거
+    const existingTimer = turnTimers.get(roomId);
+    if (existingTimer) {
+      clearTimeout(existingTimer);
+    }
+
+    const room = roomManager.getRoom(roomId);
+    if (!room || !room.currentGame) return;
+
+    const game = room.currentGame;
+    const turnTimeLimit = game.gameOptions.turnTimeLimit;
+
+    // 타임 리밋이 없으면 타이머 설정 안 함
+    if (!turnTimeLimit) return;
+
+    // 현재 플레이어가 AI이거나 끝났으면 타이머 설정 안 함
+    const currentPlayer = game.players[game.currentPlayerIndex];
+    if (currentPlayer.type === 'ai' || currentPlayer.hasFinished) return;
+
+    // 타이머 설정 (초 단위를 밀리초로 변환)
+    const timer = setTimeout(() => {
+      handleTurnTimeout(roomId);
+    }, turnTimeLimit * 1000);
+
+    turnTimers.set(roomId, timer);
+  }
+
+  // 턴 타임아웃 처리
+  function handleTurnTimeout(roomId: string) {
+    const room = roomManager.getRoom(roomId);
+    if (!room || !room.currentGame) return;
+
+    const game = room.currentGame;
+    if (game.phase !== 'playing') return;
+
+    const currentPlayer = game.players[game.currentPlayerIndex];
+    if (currentPlayer.hasFinished) return;
+
+    try {
+      // 자동으로 패스 처리
+      const updatedGame = passPlay(game, currentPlayer.id);
+      roomManager.updateGame(roomId, updatedGame);
+      io.to(roomId).emit('game:updated', updatedGame);
+
+      // 다음 턴 타이머 시작 또는 AI 처리
+      const nextPlayer = updatedGame.players[updatedGame.currentPlayerIndex];
+      if (nextPlayer.type === 'ai') {
+        setTimeout(() => processAITurn(roomId), 1000);
+      } else {
+        startTurnTimer(roomId);
+      }
+    } catch (error) {
+      console.error('턴 타임아웃 처리 오류:', error);
+    }
+  }
+
+  // 턴 타이머 정리
+  function clearTurnTimer(roomId: string) {
+    const timer = turnTimers.get(roomId);
+    if (timer) {
+      clearTimeout(timer);
+      turnTimers.delete(roomId);
+    }
+  }
 
   // AI 턴 처리
   function processAITurn(roomId: string) {
@@ -248,6 +335,7 @@ export function setupSocketServer(httpServer: ReturnType<typeof createServer>) {
       io.to(roomId).emit('game:updated', updatedGame);
 
       if (updatedGame.phase === 'finished') {
+        clearTurnTimer(roomId);
         io.to(roomId).emit(
           'game:finished',
           updatedGame.players.map((p, i) => ({
@@ -257,8 +345,13 @@ export function setupSocketServer(httpServer: ReturnType<typeof createServer>) {
           }))
         );
       } else {
-        // 다음 AI 차례면 계속 처리
-        setTimeout(() => processAITurn(roomId), 1000);
+        // 다음 플레이어 처리
+        const nextPlayer = updatedGame.players[updatedGame.currentPlayerIndex];
+        if (nextPlayer.type === 'ai') {
+          setTimeout(() => processAITurn(roomId), 1000);
+        } else {
+          startTurnTimer(roomId);
+        }
       }
     } catch (error) {
       console.error('AI 플레이 오류:', error);
