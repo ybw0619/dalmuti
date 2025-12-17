@@ -243,10 +243,16 @@ export function GameBoard({ game, room, currentPlayerId, onPlayCards, onPass, on
   return (
     <div className='h-screen w-screen flex flex-col bg-gradient-to-br from-green-900 via-emerald-800 to-teal-900'>
       {/* 상단 상태바 */}
-      <div className='bg-black/50 backdrop-blur-md px-3 sm:px-6 py-2 sm:py-3 shrink-0 border-b border-white/10'>
+      <div className={`backdrop-blur-md px-3 sm:px-6 py-2 sm:py-3 shrink-0 border-b transition-all duration-300 ${
+        isMyTurn && !currentPlayer.hasFinished
+          ? 'bg-yellow-500/20 border-yellow-400'
+          : 'bg-black/50 border-white/10'
+      }`}>
         <div className='flex justify-between items-center gap-2 sm:gap-4 text-xs sm:text-base'>
           <div className='text-yellow-400 font-bold truncate'>
-            턴: <span className='text-white'>{activePlayer?.name}</span>
+            턴: <span className={`${isMyTurn && !currentPlayer.hasFinished ? 'text-yellow-300 animate-pulse' : 'text-white'}`}>
+              {activePlayer?.name} {isMyTurn && !currentPlayer.hasFinished && '👈'}
+            </span>
           </div>
 
           {game.gameOptions?.enableRevolution && game.isRevolution && (
@@ -409,7 +415,11 @@ export function GameBoard({ game, room, currentPlayerId, onPlayCards, onPass, on
       </div>
 
       {/* 하단 - 내 카드 및 컨트롤 */}
-      <div className='shrink-0 bg-black/50 backdrop-blur-md border-t border-white/10'>
+      <div className={`shrink-0 backdrop-blur-md border-t transition-all duration-300 ${
+        isMyTurn && !currentPlayer.hasFinished
+          ? 'bg-yellow-500/20 border-yellow-400 shadow-[0_-4px_20px_rgba(250,204,21,0.3)]'
+          : 'bg-black/50 border-white/10'
+      }`}>
         {/* 내 카드 */}
         <div className='px-2 pt-12 sm:pt-16 pb-2 overflow-x-auto overflow-y-visible border-b border-white/10'>
           <div className='flex gap-1 sm:gap-2 justify-start sm:justify-center min-w-max'>
@@ -445,7 +455,11 @@ export function GameBoard({ game, room, currentPlayerId, onPlayCards, onPass, on
 
         {/* 컨트롤 영역 */}
         <div className='px-2 sm:px-4 py-2 flex flex-col sm:flex-row justify-between items-center gap-2'>
-          <div className='flex items-center gap-2 sm:gap-3 bg-amber-900/80 backdrop-blur-sm px-3 py-2 rounded-xl shrink-0'>
+          <div className={`flex items-center gap-2 sm:gap-3 backdrop-blur-sm px-3 py-2 rounded-xl shrink-0 border-2 transition-all duration-300 ${
+            isMyTurn && !currentPlayer.hasFinished
+              ? 'bg-yellow-500/30 border-yellow-400 shadow-lg shadow-yellow-400/30 scale-105'
+              : 'bg-amber-900/80 border-transparent'
+          }`}>
             <div className='text-2xl sm:text-3xl'>👤</div>
             <div>
               <div className='text-yellow-400 font-bold text-sm sm:text-base'>{currentPlayer.name}</div>
