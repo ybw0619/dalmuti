@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Game, Card as CardType } from '@/types/game';
 import { Card } from './Card';
+import { isCardPlayable } from '@/lib/game/cards';
 
 interface GameBoardProps {
   game: Game;
@@ -13,10 +14,31 @@ interface GameBoardProps {
 
 export function GameBoard({ game, currentPlayerId, onPlayCards, onPass }: GameBoardProps) {
   const [selectedCards, setSelectedCards] = useState<Set<string>>(new Set());
+  const [remainingTime, setRemainingTime] = useState<number | null>(null);
 
   const currentPlayer = game.players.find((p) => p.id === currentPlayerId);
   const isMyTurn = game.players[game.currentPlayerIndex]?.id === currentPlayerId;
   const activePlayer = game.players[game.currentPlayerIndex];
+
+  // 타이머 로직
+  useEffect(() => {
+    if (!game.gameOptions.turnTimeLimit || !game.turnStartTime) {
+      setRemainingTime(null);
+      return;
+    }
+
+    const updateTimer = () => {
+      const now = Date.now();
+      const elapsed = Math.floor((now - game.turnStartTime!) / 1000);
+      const remaining = game.gameOptions.turnTimeLimit! - elapsed;
+      setRemainingTime(Math.max(0, remaining));
+    };
+
+    updateTimer();
+    const interval = setInterval(updateTimer, 100);
+
+    return () => clearInterval(interval);
+  }, [game.turnStartTime, game.gameOptions.turnTimeLimit]);
 
   const toggleCardSelection = (cardId: string) => {
     if (!isMyTurn || currentPlayer?.hasFinished) return;
@@ -85,15 +107,17 @@ export function GameBoard({ game, currentPlayerId, onPlayCards, onPass }: GameBo
     <div className='h-screen w-screen flex flex-col bg-gradient-to-br from-green-900 via-emerald-800 to-teal-900'>
       {/* 상단 상태바 */}
       <div className='bg-black/50 backdrop-blur-md px-3 sm:px-6 py-2 sm:py-3 shrink-0 border-b border-white/10'>
-        <div className='flex justify-between items-center text-xs sm:text-base'>
+        <div className='flex justify-between items-center gap-2 sm:gap-4 text-xs sm:text-base'>
           <div className='text-yellow-400 font-bold truncate'>
             턴: <span className='text-white'>{activePlayer?.name}</span>
           </div>
+
           {game.gameOptions?.enableRevolution && game.isRevolution && (
             <div className='bg-red-600 text-white px-2 sm:px-4 py-1 sm:py-2 rounded-full text-xs sm:text-sm font-bold animate-pulse'>
               🔄 혁명!
             </div>
           )}
+
           <div className='text-yellow-400 font-bold'>
             남은: <span className='text-white'>{game.players.filter((p) => !p.hasFinished).length}명</span>
           </div>
@@ -169,6 +193,23 @@ export function GameBoard({ game, currentPlayerId, onPlayCards, onPass }: GameBo
           {/* 게임 테이블 */}
           <div className='w-full max-w-4xl flex-1 flex flex-col items-center justify-center'>
             <div className='bg-gradient-to-br from-amber-900/40 to-amber-950/40 backdrop-blur-sm rounded-3xl border-4 sm:border-8 border-amber-800/50 shadow-2xl p-4 sm:p-8 w-full'>
+              {/* 타이머 표시 (중앙 상단) */}
+              {remainingTime !== null && (
+                <div className='flex justify-center mb-4 sm:mb-6'>
+                  <div className={`
+                    px-6 sm:px-10 py-3 sm:py-5 rounded-2xl sm:rounded-3xl text-3xl sm:text-6xl font-black
+                    transition-all duration-300
+                    ${remainingTime <= 3 ? 'bg-red-600 text-white animate-pulse scale-110 animate-timer-shake' :
+                      remainingTime <= 5 ? 'bg-red-600 text-white animate-pulse scale-110' :
+                      remainingTime <= 10 ? 'bg-orange-500 text-white scale-105' :
+                      'bg-blue-600 text-white'}
+                    shadow-2xl
+                  `}>
+                    ⏱️ {remainingTime}
+                  </div>
+                </div>
+              )}
+
               <div className='text-yellow-300 text-lg sm:text-3xl font-bold mb-3 sm:mb-6 text-center animate-pulse'>
                 {activePlayer?.name}님 차례
               </div>
@@ -235,15 +276,22 @@ export function GameBoard({ game, currentPlayerId, onPlayCards, onPass }: GameBo
         {/* 내 카드 */}
         <div className='px-2 pt-12 sm:pt-16 pb-2 overflow-x-auto overflow-y-visible border-b border-white/10'>
           <div className='flex gap-1 sm:gap-2 justify-start sm:justify-center min-w-max'>
-            {currentPlayer.cards.map((card) => (
-              <Card
-                key={card.id}
-                card={card}
-                selected={selectedCards.has(card.id)}
-                onClick={() => toggleCardSelection(card.id)}
-                size='large'
-              />
-            ))}
+            {currentPlayer.cards.map((card) => {
+              const playable = isMyTurn && !currentPlayer.hasFinished
+                ? isCardPlayable(card, currentPlayer.cards, game.currentTurn, game.isRevolution)
+                : true;
+
+              return (
+                <Card
+                  key={card.id}
+                  card={card}
+                  selected={selectedCards.has(card.id)}
+                  onClick={() => toggleCardSelection(card.id)}
+                  size='large'
+                  playable={playable}
+                />
+              );
+            })}
           </div>
         </div>
 

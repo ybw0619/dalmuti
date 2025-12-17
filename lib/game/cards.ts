@@ -111,3 +111,81 @@ export function isRevolutionPlay(cards: Card[]): boolean {
   const firstRank = nonJokerCards[0].rank;
   return nonJokerCards.every(c => c.rank === firstRank);
 }
+
+// 현재 턴에서 특정 카드를 낼 수 있는지 체크
+export function isCardPlayable(
+  card: Card,
+  playerCards: Card[],
+  currentTurn: { cards: Card[] } | null,
+  isRevolution: boolean
+): boolean {
+  // 첫 턴이면 모든 카드 플레이 가능
+  if (!currentTurn) return true;
+
+  const tableCards = currentTurn.cards;
+  const requiredCount = tableCards.length;
+  const jokerCards = playerCards.filter(c => c.rank === 'joker');
+
+  // 조커 카드인 경우
+  if (card.rank === 'joker') {
+    // 조커만으로 낼 수 있는 경우 - 실제로 플레이 가능한지 체크
+    if (jokerCards.length >= requiredCount) {
+      const testJokerCards: Card[] = [];
+      for (let i = 0; i < requiredCount; i++) {
+        testJokerCards.push(jokerCards[i]);
+      }
+      // 조커만으로 낼 때도 canPlayCards로 검증 (조커는 13으로 취급됨)
+      if (canPlayCards(testJokerCards, currentTurn, isRevolution)) {
+        return true;
+      }
+    }
+
+    // 조커를 다른 카드와 섞어서 낼 수 있는 경우를 체크
+    // 모든 일반 카드 등급에 대해 조커와 함께 낼 수 있는지 확인
+    const uniqueRanks = [...new Set(playerCards.filter(c => c.rank !== 'joker').map(c => c.rank))];
+
+    for (const rank of uniqueRanks) {
+      const sameRankCards = playerCards.filter(c => c.rank === rank);
+      if (sameRankCards.length + jokerCards.length >= requiredCount) {
+        const testCards: Card[] = [];
+        for (let i = 0; i < Math.min(sameRankCards.length, requiredCount); i++) {
+          testCards.push(sameRankCards[i]);
+        }
+        const remainingCount = requiredCount - testCards.length;
+        for (let i = 0; i < remainingCount && i < jokerCards.length; i++) {
+          testCards.push(jokerCards[i]);
+        }
+        if (canPlayCards(testCards, currentTurn, isRevolution)) {
+          return true;
+        }
+      }
+    }
+
+    return false;
+  }
+
+  // 일반 카드인 경우
+  // 같은 등급의 카드가 몇 장 있는지 확인
+  const sameRankCards = playerCards.filter(c => c.rank === card.rank);
+  const totalAvailable = sameRankCards.length + jokerCards.length;
+
+  // 필요한 개수만큼 카드가 없으면 플레이 불가
+  if (totalAvailable < requiredCount) return false;
+
+  // 해당 등급의 카드로 플레이 가능한지 체크
+  const testCards: Card[] = [];
+
+  // 같은 등급 카드로 채우기
+  for (let i = 0; i < Math.min(sameRankCards.length, requiredCount); i++) {
+    testCards.push(sameRankCards[i]);
+  }
+
+  // 부족한 만큼 조커로 채우기
+  const remainingCount = requiredCount - testCards.length;
+  for (let i = 0; i < remainingCount && i < jokerCards.length; i++) {
+    testCards.push(jokerCards[i]);
+  }
+
+  // 실제로 플레이 가능한지 체크
+  return canPlayCards(testCards, currentTurn, isRevolution);
+}
