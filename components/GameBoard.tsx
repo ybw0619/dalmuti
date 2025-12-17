@@ -52,8 +52,57 @@ export function GameBoard({ game, room, currentPlayerId, onPlayCards, onPass, on
     if (!isMyTurn || currentPlayer?.hasFinished) return;
 
     const clickedCard = currentPlayer?.cards.find((c) => c.id === cardId);
-    if (!clickedCard) return;
+    if (!clickedCard || !currentPlayer) return;
 
+    // 필드에 카드가 있는 경우 (이어내기) - 자동 다중 선택
+    if (game.currentTurn && game.currentTurn.cards.length > 0) {
+      // 이미 선택된 카드라면 전체 선택 해제
+      if (selectedCards.has(cardId)) {
+        setSelectedCards(new Set());
+        return;
+      }
+
+      const requiredCount = game.currentTurn.cards.length;
+      const cardsToSelect = new Set<string>();
+
+      // 클릭한 카드 우선 추가
+      cardsToSelect.add(cardId);
+
+      // 1. 같은 랭크의 다른 카드들 찾기
+      const sameRankCards = currentPlayer.cards.filter(
+        (c) => c.rank === clickedCard.rank && c.id !== cardId
+      );
+
+      for (const card of sameRankCards) {
+        if (cardsToSelect.size < requiredCount) {
+          cardsToSelect.add(card.id);
+        } else {
+          break;
+        }
+      }
+
+      // 2. 부족하면 조커로 채우기 (클릭한 카드가 조커가 아닐 때)
+      if (clickedCard.rank !== 'joker' && cardsToSelect.size < requiredCount) {
+        const jokerCards = currentPlayer.cards.filter(
+          (c) => c.rank === 'joker' && !cardsToSelect.has(c.id)
+        );
+        for (const card of jokerCards) {
+          if (cardsToSelect.size < requiredCount) {
+            cardsToSelect.add(card.id);
+          } else {
+            break;
+          }
+        }
+      }
+
+      // 필요한 개수만큼 채워졌을 때만 선택 적용
+      if (cardsToSelect.size === requiredCount) {
+        setSelectedCards(cardsToSelect);
+      }
+      return;
+    }
+
+    // 필드에 카드가 없는 경우 (선플레이) - 기존처럼 하나씩 선택/해제
     setSelectedCards((prev) => {
       const newSet = new Set(prev);
 
@@ -101,11 +150,17 @@ export function GameBoard({ game, room, currentPlayerId, onPlayCards, onPass, on
           handlePass();
         }
       }
+      if (e.code === 'Enter') {
+        e.preventDefault();
+        if (isMyTurn && !currentPlayer?.hasFinished) {
+          handlePlayCards();
+        }
+      }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isMyTurn, currentPlayer?.hasFinished, onPass]);
+  }, [isMyTurn, currentPlayer?.hasFinished, onPass, handlePass, handlePlayCards]);
 
   if (!currentPlayer) return null;
 
@@ -359,9 +414,20 @@ export function GameBoard({ game, room, currentPlayerId, onPlayCards, onPass, on
         <div className='px-2 pt-12 sm:pt-16 pb-2 overflow-x-auto overflow-y-visible border-b border-white/10'>
           <div className='flex gap-1 sm:gap-2 justify-start sm:justify-center min-w-max'>
             {currentPlayer.cards.map((card) => {
-              const playable = isMyTurn && !currentPlayer.hasFinished
+              let playable = isMyTurn && !currentPlayer.hasFinished
                 ? isCardPlayable(card, currentPlayer.cards, game.currentTurn, game.isRevolution)
                 : true;
+
+              // 필드에 카드가 있고, 이미 필요한 개수만큼 선택했다면 선택되지 않은 카드는 비활성화
+              if (
+                playable &&
+                game.currentTurn &&
+                game.currentTurn.cards.length > 0 &&
+                selectedCards.size >= game.currentTurn.cards.length &&
+                !selectedCards.has(card.id)
+              ) {
+                playable = false;
+              }
 
               return (
                 <Card
@@ -398,9 +464,12 @@ export function GameBoard({ game, room, currentPlayerId, onPlayCards, onPass, on
               <button
                 onClick={handlePlayCards}
                 disabled={selectedCards.size === 0}
-                className='bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 disabled:from-gray-600 disabled:to-gray-700 text-white font-bold py-2 sm:py-3 px-4 sm:px-8 rounded-xl text-sm sm:text-base disabled:opacity-50 transition-all shadow-lg active:scale-95'
+                className='bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 disabled:from-gray-600 disabled:to-gray-700 text-white font-bold py-2 sm:py-3 px-4 sm:px-8 rounded-xl text-sm sm:text-base disabled:opacity-50 transition-all shadow-lg active:scale-95 flex items-center gap-2'
               >
-                🎴 카드 내기 ({selectedCards.size})
+                <span>🎴 카드 내기 ({selectedCards.size})</span>
+                <kbd className='hidden md:flex items-center gap-1 font-sans text-[10px] bg-black/20 px-1.5 py-0.5 rounded border-b-2 border-black/30 text-white/90 uppercase tracking-wider'>
+                  Enter
+                </kbd>
               </button>
               <button
                 onClick={handlePass}
