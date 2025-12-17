@@ -71,11 +71,17 @@ export function GameBoard({ game, currentPlayerId, onPlayCards, onPass }: GameBo
           handlePass();
         }
       }
+      if (e.code === 'Enter') {
+        e.preventDefault();
+        if (isMyTurn && !currentPlayer?.hasFinished) {
+          handlePlayCards();
+        }
+      }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isMyTurn, currentPlayer?.hasFinished, onPass]);
+  }, [isMyTurn, currentPlayer?.hasFinished, onPass, handlePass, handlePlayCards]);
 
   if (!currentPlayer) return null;
 
@@ -268,9 +274,12 @@ export function GameBoard({ game, currentPlayerId, onPlayCards, onPass }: GameBo
               <button
                 onClick={handlePlayCards}
                 disabled={selectedCards.size === 0}
-                className='bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 disabled:from-gray-600 disabled:to-gray-700 text-white font-bold py-2 sm:py-3 px-4 sm:px-8 rounded-xl text-sm sm:text-base disabled:opacity-50 transition-all shadow-lg active:scale-95'
+                className='bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 disabled:from-gray-600 disabled:to-gray-700 text-white font-bold py-2 sm:py-3 px-4 sm:px-8 rounded-xl text-sm sm:text-base disabled:opacity-50 transition-all shadow-lg active:scale-95 flex items-center gap-2'
               >
-                🎴 카드 내기 ({selectedCards.size})
+                <span>🎴 카드 내기 ({selectedCards.size})</span>
+                <kbd className='hidden md:flex items-center gap-1 font-sans text-[10px] bg-black/20 px-1.5 py-0.5 rounded border-b-2 border-black/30 text-white/90 uppercase tracking-wider'>
+                  Enter
+                </kbd>
               </button>
               <button
                 onClick={handlePass}
