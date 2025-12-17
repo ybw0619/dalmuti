@@ -1,18 +1,20 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Game, Card as CardType } from '@/types/game';
+import { Game, Room, Card as CardType } from '@/types/game';
 import { Card } from './Card';
 import { isCardPlayable } from '@/lib/game/cards';
 
 interface GameBoardProps {
   game: Game;
+  room: Room;
   currentPlayerId: string;
   onPlayCards: (cards: CardType[]) => void;
   onPass: () => void;
+  onRestart: () => void;
 }
 
-export function GameBoard({ game, currentPlayerId, onPlayCards, onPass }: GameBoardProps) {
+export function GameBoard({ game, room, currentPlayerId, onPlayCards, onPass, onRestart }: GameBoardProps) {
   const [selectedCards, setSelectedCards] = useState<Set<string>>(new Set());
   const [remainingTime, setRemainingTime] = useState<number | null>(null);
 
@@ -22,6 +24,12 @@ export function GameBoard({ game, currentPlayerId, onPlayCards, onPass }: GameBo
 
   // 타이머 로직
   useEffect(() => {
+    // 게임이 끝났으면 타이머 정지
+    if (game.phase === 'finished') {
+      setRemainingTime(null);
+      return;
+    }
+
     if (!game.gameOptions.turnTimeLimit || !game.turnStartTime) {
       setRemainingTime(null);
       return;
@@ -38,7 +46,7 @@ export function GameBoard({ game, currentPlayerId, onPlayCards, onPass }: GameBo
     const interval = setInterval(updateTimer, 100);
 
     return () => clearInterval(interval);
-  }, [game.turnStartTime, game.gameOptions.turnTimeLimit]);
+  }, [game.turnStartTime, game.gameOptions.turnTimeLimit, game.phase]);
 
   const toggleCardSelection = (cardId: string) => {
     if (!isMyTurn || currentPlayer?.hasFinished) return;
@@ -102,6 +110,80 @@ export function GameBoard({ game, currentPlayerId, onPlayCards, onPass }: GameBo
   if (!currentPlayer) return null;
 
   const otherPlayers = game.players.filter((p) => p.id !== currentPlayerId);
+
+  // 게임 종료 화면
+  if (game.phase === 'finished') {
+    const sortedPlayers = [...game.players].sort((a, b) => {
+      if (a.finishOrder === undefined) return 1;
+      if (b.finishOrder === undefined) return -1;
+      return a.finishOrder - b.finishOrder;
+    });
+
+    return (
+      <div className='h-screen w-screen flex items-center justify-center bg-gradient-to-br from-green-900 via-emerald-800 to-teal-900'>
+        <div className='bg-gradient-to-br from-amber-900/90 to-amber-950/90 backdrop-blur-lg p-6 sm:p-12 rounded-3xl border-4 sm:border-8 border-yellow-500/50 shadow-2xl max-w-3xl w-full mx-4'>
+          <div className='text-center mb-8'>
+            <h1 className='text-4xl sm:text-6xl font-black text-yellow-400 mb-4 animate-pulse'>
+              🏆 게임 종료! 🏆
+            </h1>
+            <p className='text-xl sm:text-2xl text-amber-200'>최종 순위</p>
+          </div>
+
+          <div className='space-y-3 mb-8'>
+            {sortedPlayers.map((player, index) => {
+              const isCurrentPlayer = player.id === currentPlayerId;
+              const medals = ['🥇', '🥈', '🥉'];
+              const medal = medals[index] || '🎖️';
+
+              return (
+                <div
+                  key={player.id}
+                  className={`
+                    flex items-center justify-between p-4 sm:p-6 rounded-2xl
+                    ${isCurrentPlayer ? 'bg-yellow-500/30 border-2 border-yellow-400' : 'bg-black/30'}
+                    ${index === 0 ? 'scale-105 shadow-lg shadow-yellow-500/50' : ''}
+                  `}
+                >
+                  <div className='flex items-center gap-3 sm:gap-4'>
+                    <div className='text-3xl sm:text-4xl'>{medal}</div>
+                    <div>
+                      <div className='text-white font-bold text-lg sm:text-2xl flex items-center gap-2'>
+                        {player.name}
+                        {isCurrentPlayer && <span className='text-yellow-400 text-sm'>(나)</span>}
+                      </div>
+                      <div className='text-amber-300 text-sm sm:text-base'>
+                        {player.type === 'ai' ? '🤖 AI' : '👤 플레이어'}
+                      </div>
+                    </div>
+                  </div>
+                  <div className='text-yellow-400 font-black text-2xl sm:text-3xl'>
+                    {player.finishOrder || sortedPlayers.length}등
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          <div className='flex flex-col sm:flex-row gap-3 sm:gap-4'>
+            <button
+              onClick={() => window.location.reload()}
+              className='flex-1 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-bold py-4 px-8 rounded-xl text-lg transition-all shadow-lg active:scale-95'
+            >
+              🏠 로비로
+            </button>
+            {room.hostId === currentPlayerId && (
+              <button
+                onClick={onRestart}
+                className='flex-1 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white font-bold py-4 px-8 rounded-xl text-lg transition-all shadow-lg active:scale-95'
+              >
+                ▶️ 다음 판
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className='h-screen w-screen flex flex-col bg-gradient-to-br from-green-900 via-emerald-800 to-teal-900'>

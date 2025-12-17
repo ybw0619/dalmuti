@@ -146,6 +146,44 @@ export function setupSocketServer(httpServer: ReturnType<typeof createServer>) {
       }
     });
 
+    // 게임 재시작 (다음 판)
+    socket.on('game:restart', () => {
+      try {
+        const room = roomManager.findRoomByPlayer(socket.id);
+        if (!room) {
+          socket.emit('error', '방을 찾을 수 없습니다');
+          return;
+        }
+
+        // 기존 타이머 정리
+        clearTurnTimer(room.id);
+
+        // 게임 재시작 (준비 체크 건너뛰기, 순위 적용)
+        const game = roomManager.startGame(room.id, true, true);
+        io.to(room.id).emit('game:started', game);
+
+        // 세금 단계 시작
+        if (game.phase === 'tax') {
+          const taxRequests = calculateTaxRequests(game.players);
+          taxRequests.forEach((req) => {
+            io.to(req.fromPlayerId).emit('tax:request', req);
+          });
+        }
+
+        // 턴 타이머 시작 (플레잉 단계이고 현재 플레이어가 AI가 아니면)
+        if (game.phase === 'playing') {
+          const currentPlayer = game.players[game.currentPlayerIndex];
+          if (currentPlayer.type === 'ai') {
+            setTimeout(() => processAITurn(room.id), 1000);
+          } else {
+            startTurnTimer(room.id);
+          }
+        }
+      } catch (error) {
+        socket.emit('error', (error as Error).message);
+      }
+    });
+
     // 세금 제출
     socket.on('tax:submit', (cards) => {
       const room = roomManager.findRoomByPlayer(socket.id);

@@ -85,6 +85,7 @@ export interface ClientToServerEvents {
   'room:join': (data: { roomId: string; playerName: string }, callback: (room: Room) => void) => void;
   'room:leave': () => void;
   'game:start': () => void;
+  'game:restart': () => void;
   'game:play': (cards: Card[]) => void;
   'game:pass': () => void;
   'room:addAI': () => void;

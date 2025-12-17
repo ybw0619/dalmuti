@@ -132,7 +132,7 @@ export class RoomManager {
   }
 
   // 게임 시작
-  startGame(roomId: string): Game {
+  startGame(roomId: string, skipReadyCheck: boolean = false, isRestart: boolean = false): Game {
     const room = this.rooms.get(roomId);
     if (!room) throw new Error('방을 찾을 수 없습니다');
 
@@ -140,12 +140,14 @@ export class RoomManager {
       throw new Error('최소 2명의 플레이어가 필요합니다');
     }
 
-    const allReady = room.players.every(p => p.isReady || p.type === 'ai');
-    if (!allReady) {
-      throw new Error('모든 플레이어가 준비되지 않았습니다');
+    if (!skipReadyCheck) {
+      const allReady = room.players.every(p => p.isReady || p.type === 'ai');
+      if (!allReady) {
+        throw new Error('모든 플레이어가 준비되지 않았습니다');
+      }
     }
 
-    const game = createGame(room.players, roomId, room.gameOptions);
+    const game = createGame(room.players, roomId, room.gameOptions, isRestart);
     room.currentGame = game;
     this.rooms.set(roomId, room);
 

@@ -66,6 +66,10 @@ export default function Home() {
     socket.emit('game:pass');
   };
 
+  const handleRestartGame = () => {
+    socket.emit('game:restart');
+  };
+
   const handleUpdateOptions = (options: GameOptions) => {
     socket.emit('room:updateOptions', options);
   };
@@ -96,13 +100,15 @@ export default function Home() {
     );
   }
 
-  if (gameState === 'playing' && game) {
+  if (gameState === 'playing' && game && room) {
     return (
       <GameBoard
         game={game}
+        room={room}
         currentPlayerId={socket.id || ''}
         onPlayCards={handlePlayCards}
         onPass={handlePass}
+        onRestart={handleRestartGame}
       />
     );
   }

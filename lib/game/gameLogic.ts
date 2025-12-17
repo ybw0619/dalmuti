@@ -2,12 +2,30 @@ import { Game, Player, Card, Turn, GamePhase, TaxRequest, GameOptions } from '@/
 import { dealCards, canPlayCards, isRevolutionPlay, sortCards } from './cards';
 
 // 새 게임 생성
-export function createGame(players: Player[], roomId: string, gameOptions: GameOptions): Game {
+export function createGame(players: Player[], roomId: string, gameOptions: GameOptions, isRestart: boolean = false): Game {
+  // 재시작이면 이전 판 순위대로 position 재조정
+  let orderedPlayers = players;
+  if (isRestart) {
+    // finishOrder가 있는 플레이어들을 순위대로 정렬
+    orderedPlayers = [...players].sort((a, b) => {
+      // finishOrder가 없으면 꼴등 (가장 큰 값)
+      const aOrder = a.finishOrder ?? players.length + 1;
+      const bOrder = b.finishOrder ?? players.length + 1;
+      return aOrder - bOrder;
+    });
+
+    // 정렬된 순서대로 position 업데이트 (1등부터 1, 2, 3...)
+    orderedPlayers = orderedPlayers.map((player, index) => ({
+      ...player,
+      position: index + 1,
+    }));
+  }
+
   // 카드 분배
-  const hands = dealCards(players.length);
+  const hands = dealCards(orderedPlayers.length);
 
   // 각 플레이어에게 카드 배분
-  const gamePlayers = players.map((player, index) => ({
+  const gamePlayers = orderedPlayers.map((player, index) => ({
     ...player,
     cards: sortCards(hands[index], false),
     hasFinished: false,
