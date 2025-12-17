@@ -52,6 +52,15 @@ export function GameBoard({ game, currentPlayerId, onPlayCards, onPass }: GameBo
       if (newSet.has(cardId)) {
         newSet.delete(cardId);
       } else {
+        // 필드에 카드가 있는 경우 개수 제한 체크
+        if (
+          game.currentTurn &&
+          game.currentTurn.cards.length > 0 &&
+          newSet.size >= game.currentTurn.cards.length
+        ) {
+          return newSet;
+        }
+
         if (newSet.size === 0) {
           newSet.add(cardId);
         } else {
@@ -283,9 +292,20 @@ export function GameBoard({ game, currentPlayerId, onPlayCards, onPass }: GameBo
         <div className='px-2 pt-12 sm:pt-16 pb-2 overflow-x-auto overflow-y-visible border-b border-white/10'>
           <div className='flex gap-1 sm:gap-2 justify-start sm:justify-center min-w-max'>
             {currentPlayer.cards.map((card) => {
-              const playable = isMyTurn && !currentPlayer.hasFinished
+              let playable = isMyTurn && !currentPlayer.hasFinished
                 ? isCardPlayable(card, currentPlayer.cards, game.currentTurn, game.isRevolution)
                 : true;
+
+              // 필드에 카드가 있고, 이미 필요한 개수만큼 선택했다면 선택되지 않은 카드는 비활성화
+              if (
+                playable &&
+                game.currentTurn &&
+                game.currentTurn.cards.length > 0 &&
+                selectedCards.size >= game.currentTurn.cards.length &&
+                !selectedCards.has(card.id)
+              ) {
+                playable = false;
+              }
 
               return (
                 <Card
