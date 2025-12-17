@@ -23,6 +23,12 @@ export function setupSocketServer(httpServer: ReturnType<typeof createServer>) {
   io.on('connection', (socket) => {
     console.log('클라이언트 연결:', socket.id);
 
+    // 방 목록 가져오기
+    socket.on('room:list', (callback) => {
+      const rooms = roomManager.getAllRooms();
+      callback(rooms);
+    });
+
     // 방 생성
     socket.on('room:create', ({ name, playerName }, callback) => {
       try {

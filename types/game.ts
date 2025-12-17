@@ -70,6 +70,7 @@ export interface Game {
 // Socket 이벤트 타입
 export interface ServerToClientEvents {
   'room:updated': (room: Room) => void;
+  'room:list': (rooms: Room[]) => void;
   'game:started': (game: Game) => void;
   'game:updated': (game: Game) => void;
   'game:turn': (turn: Turn) => void;
@@ -84,6 +85,7 @@ export interface ClientToServerEvents {
   'room:create': (data: { name: string; playerName: string }, callback: (room: Room) => void) => void;
   'room:join': (data: { roomId: string; playerName: string }, callback: (room: Room) => void) => void;
   'room:leave': () => void;
+  'room:list': (callback: (rooms: Room[]) => void) => void;
   'game:start': () => void;
   'game:restart': () => void;
   'game:play': (cards: Card[]) => void;
