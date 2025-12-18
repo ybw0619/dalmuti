@@ -164,6 +164,28 @@ export function setupSocketServer(httpServer: ReturnType<typeof createServer>) {
         // 기존 타이머 정리
         clearTurnTimer(room.id);
 
+        // 이전 게임이 있다면 순위대로 room의 플레이어 배열 재정렬
+        if (room.currentGame) {
+          console.log('이전 게임이 있다면 순위대로 room의 플레이어 배열 재정렬');
+
+          // 현재 게임의 플레이어들로부터 finishOrder 매핑 생성
+          const finishOrderMap = new Map<string, number>();
+          room.currentGame.players.forEach((player) => {
+            if (player.finishOrder !== undefined) {
+              finishOrderMap.set(player.id, player.finishOrder);
+            }
+          });
+
+          // 완료된 게임의 순위를 사용하여 room.players 정렬
+          room.players = [...room.players].sort((a, b) => {
+            const aOrder = finishOrderMap.get(a.id) ?? room.players.length + 1;
+            const bOrder = finishOrderMap.get(b.id) ?? room.players.length + 1;
+            return aOrder - bOrder;
+          });
+        }
+
+        console.log({ p: room.players });
+
         // 게임 재시작 (준비 체크 건너뛰기, 순위 적용)
         const game = roomManager.startGame(room.id, true, true);
         io.to(room.id).emit('game:started', game);
