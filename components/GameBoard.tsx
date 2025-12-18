@@ -438,19 +438,22 @@ export function GameBoard({ game, room, currentPlayerId, onPlayCards, onPass, on
         <div className='px-2 pt-12 sm:pt-16 pb-2 overflow-x-auto overflow-y-visible border-b border-white/10'>
           <div className='flex gap-1 sm:gap-2 justify-start sm:justify-center min-w-max'>
             {currentPlayer.cards.map((card) => {
-              let playable = isMyTurn && !currentPlayer.hasFinished
-                ? isCardPlayable(card, currentPlayer.cards, game.currentTurn, game.isRevolution)
-                : true;
+              // 내 턴이 아니거나 이미 끝났으면 모든 카드 비활성화
+              let playable = false;
 
-              // 필드에 카드가 있고, 이미 필요한 개수만큼 선택했다면 선택되지 않은 카드는 비활성화
-              if (
-                playable &&
-                game.currentTurn &&
-                game.currentTurn.cards.length > 0 &&
-                selectedCards.size >= game.currentTurn.cards.length &&
-                !selectedCards.has(card.id)
-              ) {
-                playable = false;
+              if (isMyTurn && !currentPlayer.hasFinished) {
+                playable = isCardPlayable(card, currentPlayer.cards, game.currentTurn, game.isRevolution);
+
+                // 필드에 카드가 있고, 이미 필요한 개수만큼 선택했다면 선택되지 않은 카드는 비활성화
+                if (
+                  playable &&
+                  game.currentTurn &&
+                  game.currentTurn.cards.length > 0 &&
+                  selectedCards.size >= game.currentTurn.cards.length &&
+                  !selectedCards.has(card.id)
+                ) {
+                  playable = false;
+                }
               }
 
               return (
