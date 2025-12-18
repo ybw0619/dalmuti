@@ -6,12 +6,13 @@ import { Card as CardType } from '@/types/game';
 interface CardProps {
   card: CardType;
   selected?: boolean;
+  focused?: boolean;
   onClick?: () => void;
   size?: 'small' | 'medium' | 'large';
   playable?: boolean;
 }
 
-export function Card({ card, selected, onClick, size = 'medium', playable = true }: CardProps) {
+export function Card({ card, selected, focused, onClick, size = 'medium', playable = true }: CardProps) {
   const [isShaking, setIsShaking] = useState(false);
 
   const sizeClasses = {
@@ -46,6 +47,7 @@ export function Card({ card, selected, onClick, size = 'medium', playable = true
         aspect-[9/16]
         transition-all duration-200 ease-out
         ${selected ? '-translate-y-4 sm:-translate-y-8 scale-105' : playable && onClick ? 'hover:scale-105' : ''}
+        ${focused ? 'ring-4 ring-blue-400 scale-110 z-10' : ''}
         ${onClick ? 'cursor-pointer active:scale-95' : 'cursor-default'}
         relative shrink-0
         ${selected ? 'shadow-2xl shadow-yellow-400/50' : 'shadow-lg shadow-black/30'}

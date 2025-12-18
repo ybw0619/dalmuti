@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Game, Room, Card as CardType } from '@/types/game';
 import { Card } from './Card';
 import { isCardPlayable } from '@/lib/game/cards';
@@ -17,10 +17,44 @@ interface GameBoardProps {
 export function GameBoard({ game, room, currentPlayerId, onPlayCards, onPass, onRestart }: GameBoardProps) {
   const [selectedCards, setSelectedCards] = useState<Set<string>>(new Set());
   const [remainingTime, setRemainingTime] = useState<number | null>(null);
+  const [focusedCardIndex, setFocusedCardIndex] = useState<number>(-1);
+  const cardsContainerRef = useRef<HTMLDivElement>(null);
 
   const currentPlayer = game.players.find((p) => p.id === currentPlayerId);
   const isMyTurn = game.players[game.currentPlayerIndex]?.id === currentPlayerId;
   const activePlayer = game.players[game.currentPlayerIndex];
+
+  // 포커스된 카드로 자동 스크롤
+  useEffect(() => {
+    if (focusedCardIndex >= 0 && cardsContainerRef.current) {
+      const container = cardsContainerRef.current;
+      const cardElements = container.children[0].children; // flex container 내부의 카드들
+      const focusedCard = cardElements[focusedCardIndex] as HTMLElement;
+
+      if (focusedCard) {
+        const containerRect = container.getBoundingClientRect();
+        const cardRect = focusedCard.getBoundingClientRect();
+
+        // 카드가 화면 왼쪽으로 벗어난 경우
+        if (cardRect.left < containerRect.left) {
+          container.scrollLeft += cardRect.left - containerRect.left - 20; // 여유 공간 20px
+        }
+        // 카드가 화면 오른쪽으로 벗어난 경우
+        else if (cardRect.right > containerRect.right) {
+          container.scrollLeft += cardRect.right - containerRect.right + 20; // 여유 공간 20px
+        }
+      }
+    }
+  }, [focusedCardIndex]);
+
+  // 턴이 돌아오면 마지막 카드(오른쪽)에 포커스
+  useEffect(() => {
+    if (isMyTurn && !currentPlayer?.hasFinished && (currentPlayer?.cards.length ?? 0) > 0) {
+      setFocusedCardIndex((currentPlayer?.cards.length || 1) - 1);
+    } else {
+      setFocusedCardIndex(-1);
+    }
+  }, [isMyTurn, currentPlayer?.hasFinished, currentPlayer?.cards.length]);
 
   // 타이머 로직
   useEffect(() => {
@@ -158,23 +192,55 @@ export function GameBoard({ game, room, currentPlayerId, onPlayCards, onPass, on
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.code === 'Space') {
-        e.preventDefault();
-        if (isMyTurn && !currentPlayer?.hasFinished) {
+      // 내 턴이 아니거나 완료했으면 무시
+      if (!isMyTurn || currentPlayer?.hasFinished) return;
+
+      switch (e.code) {
+        case 'ArrowLeft':
+          e.preventDefault();
+          setFocusedCardIndex((prev) => {
+            const maxIndex = (currentPlayer?.cards.length || 1) - 1;
+            return prev <= 0 ? maxIndex : prev - 1;
+          });
+          break;
+        case 'ArrowRight':
+          e.preventDefault();
+          setFocusedCardIndex((prev) => {
+            const maxIndex = (currentPlayer?.cards.length || 1) - 1;
+            return prev >= maxIndex ? 0 : prev + 1;
+          });
+          break;
+        case 'Space':
+          e.preventDefault();
+          if (focusedCardIndex >= 0 && currentPlayer?.cards[focusedCardIndex]) {
+            toggleCardSelection(currentPlayer.cards[focusedCardIndex].id);
+          }
+          break;
+        case 'KeyS':
+          e.preventDefault();
           handlePass();
-        }
-      }
-      if (e.code === 'Enter') {
-        e.preventDefault();
-        if (isMyTurn && !currentPlayer?.hasFinished) {
+          break;
+        case 'Enter':
+          e.preventDefault();
           handlePlayCards();
-        }
+          break;
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isMyTurn, currentPlayer?.hasFinished, onPass, handlePass, handlePlayCards]);
+  }, [
+    isMyTurn, 
+    currentPlayer?.hasFinished, 
+    currentPlayer?.cards, 
+    focusedCardIndex, 
+    handlePass, 
+    handlePlayCards,
+    // toggleCardSelection은 의존성 배열에 넣지 않아도 되지만(함수형 업데이트 사용 등),
+    // 여기서는 useCallback으로 감싸져 있지 않으므로 경고가 뜰 수 있음.
+    // 하지만 toggleCardSelection 내부에서 state를 참조하므로 최신버전이 필요함.
+    // useEffect가 자주 재실행되겠지만 기능상 문제는 없음.
+  ]);
 
   if (!currentPlayer) return null;
 
@@ -434,10 +500,36 @@ export function GameBoard({ game, room, currentPlayerId, onPlayCards, onPass, on
           ? 'bg-yellow-500/20 border-yellow-400 shadow-[0_-4px_20px_rgba(250,204,21,0.3)]'
           : 'bg-black/50 border-white/10'
       }`}>
+        {/* 키보드 조작 가이드 (내 턴일 때만 표시) */}
+        {isMyTurn && !currentPlayer.hasFinished && (
+          <div className='hidden sm:flex justify-center items-center gap-6 py-1 bg-black/20 text-[10px] text-white/50 border-b border-white/5'>
+            <div className='flex items-center gap-1'>
+              <kbd className='bg-black/30 px-1.5 py-0.5 rounded border border-white/10'>←</kbd>
+              <kbd className='bg-black/30 px-1.5 py-0.5 rounded border border-white/10'>→</kbd>
+              <span>카드 이동</span>
+            </div>
+            <div className='flex items-center gap-1'>
+              <kbd className='bg-black/30 px-1.5 py-0.5 rounded border border-white/10'>Space</kbd>
+              <span>선택/취소</span>
+            </div>
+            <div className='flex items-center gap-1'>
+              <kbd className='bg-black/30 px-1.5 py-0.5 rounded border border-white/10'>Enter</kbd>
+              <span>내기</span>
+            </div>
+            <div className='flex items-center gap-1'>
+              <kbd className='bg-black/30 px-1.5 py-0.5 rounded border border-white/10'>S</kbd>
+              <span>패스</span>
+            </div>
+          </div>
+        )}
+
         {/* 내 카드 */}
-        <div className='px-2 pt-12 sm:pt-16 pb-2 overflow-x-auto overflow-y-visible border-b border-white/10'>
+        <div 
+          ref={cardsContainerRef}
+          className='px-2 pt-12 sm:pt-16 pb-2 overflow-x-auto overflow-y-visible border-b border-white/10 scroll-smooth'
+        >
           <div className='flex gap-1 sm:gap-2 justify-start sm:justify-center min-w-max'>
-            {currentPlayer.cards.map((card) => {
+            {currentPlayer.cards.map((card, index) => {
               let playable = isMyTurn && !currentPlayer.hasFinished
                 ? isCardPlayable(card, currentPlayer.cards, game.currentTurn, game.isRevolution)
                 : true;
@@ -458,7 +550,11 @@ export function GameBoard({ game, room, currentPlayerId, onPlayCards, onPass, on
                   key={card.id}
                   card={card}
                   selected={selectedCards.has(card.id)}
-                  onClick={() => toggleCardSelection(card.id)}
+                  focused={index === focusedCardIndex}
+                  onClick={() => {
+                    setFocusedCardIndex(index); // 클릭 시 해당 카드로 포커스 이동
+                    toggleCardSelection(card.id);
+                  }}
                   size='large'
                   playable={playable}
                 />
@@ -505,7 +601,7 @@ export function GameBoard({ game, room, currentPlayerId, onPlayCards, onPass, on
               >
                 <span>✋ 패스</span>
                 <kbd className='hidden md:flex items-center gap-1 font-sans text-[10px] bg-black/20 px-1.5 py-0.5 rounded border-b-2 border-black/30 text-white/90 uppercase tracking-wider'>
-                  Space
+                  S
                 </kbd>
               </button>
             </div>
