@@ -47,10 +47,27 @@ export function GameBoard({ game, room, currentPlayerId, onPlayCards, onPass, on
     }
   }, [focusedCardIndex]);
 
-  // 턴이 돌아오면 마지막 카드(오른쪽)에 포커스
+  // 턴이 돌아오면 낼 수 있는 카드 중 가장 오른쪽, 없으면 전체 중 가장 오른쪽 카드에 포커스
   useEffect(() => {
     if (isMyTurn && !currentPlayer?.hasFinished && (currentPlayer?.cards.length ?? 0) > 0) {
-      setFocusedCardIndex((currentPlayer?.cards.length || 1) - 1);
+      if (!currentPlayer) return;
+
+      // 뒤에서부터(오른쪽부터) 탐색하여 낼 수 있는 첫 번째 카드 찾기
+      let foundIndex = -1;
+      for (let i = currentPlayer.cards.length - 1; i >= 0; i--) {
+        const card = currentPlayer.cards[i];
+        if (isCardPlayable(card, currentPlayer.cards, game.currentTurn, game.isRevolution)) {
+          foundIndex = i;
+          break;
+        }
+      }
+
+      // 낼 수 있는 카드가 없으면 가장 마지막(오른쪽) 카드 선택
+      if (foundIndex === -1) {
+        foundIndex = currentPlayer.cards.length - 1;
+      }
+
+      setFocusedCardIndex(foundIndex);
     } else {
       setFocusedCardIndex(-1);
     }
