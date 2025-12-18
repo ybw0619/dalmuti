@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Game, Room, Card as CardType } from '@/types/game';
 import { Card } from './Card';
 import { isCardPlayable } from '@/lib/game/cards';
@@ -17,10 +17,44 @@ interface GameBoardProps {
 export function GameBoard({ game, room, currentPlayerId, onPlayCards, onPass, onRestart }: GameBoardProps) {
   const [selectedCards, setSelectedCards] = useState<Set<string>>(new Set());
   const [remainingTime, setRemainingTime] = useState<number | null>(null);
+  const [focusedCardIndex, setFocusedCardIndex] = useState<number>(-1);
+  const cardsContainerRef = useRef<HTMLDivElement>(null);
 
   const currentPlayer = game.players.find((p) => p.id === currentPlayerId);
   const isMyTurn = game.players[game.currentPlayerIndex]?.id === currentPlayerId;
   const activePlayer = game.players[game.currentPlayerIndex];
+
+  // 포커스된 카드로 자동 스크롤
+  useEffect(() => {
+    if (focusedCardIndex >= 0 && cardsContainerRef.current) {
+      const container = cardsContainerRef.current;
+      const cardElements = container.children[0].children; // flex container 내부의 카드들
+      const focusedCard = cardElements[focusedCardIndex] as HTMLElement;
+
+      if (focusedCard) {
+        const containerRect = container.getBoundingClientRect();
+        const cardRect = focusedCard.getBoundingClientRect();
+
+        // 카드가 화면 왼쪽으로 벗어난 경우
+        if (cardRect.left < containerRect.left) {
+          container.scrollLeft += cardRect.left - containerRect.left - 20; // 여유 공간 20px
+        }
+        // 카드가 화면 오른쪽으로 벗어난 경우
+        else if (cardRect.right > containerRect.right) {
+          container.scrollLeft += cardRect.right - containerRect.right + 20; // 여유 공간 20px
+        }
+      }
+    }
+  }, [focusedCardIndex]);
+
+  // 턴이 돌아오면 마지막 카드(오른쪽)에 포커스
+  useEffect(() => {
+    if (isMyTurn && !currentPlayer?.hasFinished && (currentPlayer?.cards.length ?? 0) > 0) {
+      setFocusedCardIndex((currentPlayer?.cards.length || 1) - 1);
+    } else {
+      setFocusedCardIndex(-1);
+    }
+  }, [isMyTurn, currentPlayer?.hasFinished, currentPlayer?.cards.length]);
 
   // 타이머 로직
   useEffect(() => {
@@ -69,9 +103,7 @@ export function GameBoard({ game, room, currentPlayerId, onPlayCards, onPass, on
       cardsToSelect.add(cardId);
 
       // 1. 같은 랭크의 다른 카드들 찾기
-      const sameRankCards = currentPlayer.cards.filter(
-        (c) => c.rank === clickedCard.rank && c.id !== cardId
-      );
+      const sameRankCards = currentPlayer.cards.filter((c) => c.rank === clickedCard.rank && c.id !== cardId);
 
       for (const card of sameRankCards) {
         if (cardsToSelect.size < requiredCount) {
@@ -83,9 +115,7 @@ export function GameBoard({ game, room, currentPlayerId, onPlayCards, onPass, on
 
       // 2. 부족하면 조커로 채우기 (클릭한 카드가 조커가 아닐 때)
       if (clickedCard.rank !== 'joker' && cardsToSelect.size < requiredCount) {
-        const jokerCards = currentPlayer.cards.filter(
-          (c) => c.rank === 'joker' && !cardsToSelect.has(c.id)
-        );
+        const jokerCards = currentPlayer.cards.filter((c) => c.rank === 'joker' && !cardsToSelect.has(c.id));
         for (const card of jokerCards) {
           if (cardsToSelect.size < requiredCount) {
             cardsToSelect.add(card.id);
@@ -101,16 +131,14 @@ export function GameBoard({ game, room, currentPlayerId, onPlayCards, onPass, on
     }
 
     // 필드에 카드가 없는 경우 (선플레이)
-    
+
     // 선택된 카드가 없는 경우 - 해당 랭크의 모든 카드 자동 선택
     if (selectedCards.size === 0) {
       const newSet = new Set<string>();
       newSet.add(cardId);
-      
-      const sameRankCards = currentPlayer.cards.filter(
-        (c) => c.rank === clickedCard.rank && c.id !== cardId
-      );
-      
+
+      const sameRankCards = currentPlayer.cards.filter((c) => c.rank === clickedCard.rank && c.id !== cardId);
+
       sameRankCards.forEach((c) => newSet.add(c.id));
       setSelectedCards(newSet);
       return;
@@ -158,23 +186,55 @@ export function GameBoard({ game, room, currentPlayerId, onPlayCards, onPass, on
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.code === 'Space') {
-        e.preventDefault();
-        if (isMyTurn && !currentPlayer?.hasFinished) {
+      // 내 턴이 아니거나 완료했으면 무시
+      if (!isMyTurn || currentPlayer?.hasFinished) return;
+
+      switch (e.code) {
+        case 'ArrowLeft':
+          e.preventDefault();
+          setFocusedCardIndex((prev) => {
+            const maxIndex = (currentPlayer?.cards.length || 1) - 1;
+            return prev <= 0 ? maxIndex : prev - 1;
+          });
+          break;
+        case 'ArrowRight':
+          e.preventDefault();
+          setFocusedCardIndex((prev) => {
+            const maxIndex = (currentPlayer?.cards.length || 1) - 1;
+            return prev >= maxIndex ? 0 : prev + 1;
+          });
+          break;
+        case 'Space':
+          e.preventDefault();
+          if (focusedCardIndex >= 0 && currentPlayer?.cards[focusedCardIndex]) {
+            toggleCardSelection(currentPlayer.cards[focusedCardIndex].id);
+          }
+          break;
+        case 'KeyS':
+          e.preventDefault();
           handlePass();
-        }
-      }
-      if (e.code === 'Enter') {
-        e.preventDefault();
-        if (isMyTurn && !currentPlayer?.hasFinished) {
+          break;
+        case 'Enter':
+          e.preventDefault();
           handlePlayCards();
-        }
+          break;
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isMyTurn, currentPlayer?.hasFinished, onPass, handlePass, handlePlayCards]);
+  }, [
+    isMyTurn,
+    currentPlayer?.hasFinished,
+    currentPlayer?.cards,
+    focusedCardIndex,
+    handlePass,
+    handlePlayCards,
+    // toggleCardSelection은 의존성 배열에 넣지 않아도 되지만(함수형 업데이트 사용 등),
+    // 여기서는 useCallback으로 감싸져 있지 않으므로 경고가 뜰 수 있음.
+    // 하지만 toggleCardSelection 내부에서 state를 참조하므로 최신버전이 필요함.
+    // useEffect가 자주 재실행되겠지만 기능상 문제는 없음.
+  ]);
 
   if (!currentPlayer) return null;
 
@@ -192,9 +252,7 @@ export function GameBoard({ game, room, currentPlayerId, onPlayCards, onPass, on
       <div className='h-screen w-screen flex items-center justify-center bg-gradient-to-br from-green-900 via-emerald-800 to-teal-900'>
         <div className='bg-gradient-to-br from-amber-900/90 to-amber-950/90 backdrop-blur-lg p-6 sm:p-12 rounded-3xl border-4 sm:border-8 border-yellow-500/50 shadow-2xl max-w-3xl w-full mx-4'>
           <div className='text-center mb-8'>
-            <h1 className='text-4xl sm:text-6xl font-black text-yellow-400 mb-4 animate-pulse'>
-              🏆 게임 종료! 🏆
-            </h1>
+            <h1 className='text-4xl sm:text-6xl font-black text-yellow-400 mb-4 animate-pulse'>🏆 게임 종료! 🏆</h1>
             <p className='text-xl sm:text-2xl text-amber-200'>최종 순위</p>
           </div>
 
@@ -257,14 +315,17 @@ export function GameBoard({ game, room, currentPlayerId, onPlayCards, onPass, on
   return (
     <div className='h-screen w-screen flex flex-col bg-gradient-to-br from-green-900 via-emerald-800 to-teal-900'>
       {/* 상단 상태바 */}
-      <div className={`backdrop-blur-md px-3 sm:px-6 py-2 sm:py-3 shrink-0 border-b transition-all duration-300 ${
-        isMyTurn && !currentPlayer.hasFinished
-          ? 'bg-yellow-500/20 border-yellow-400'
-          : 'bg-black/50 border-white/10'
-      }`}>
+      <div
+        className={`backdrop-blur-md px-3 sm:px-6 py-2 sm:py-3 shrink-0 border-b transition-all duration-300 ${
+          isMyTurn && !currentPlayer.hasFinished ? 'bg-yellow-500/20 border-yellow-400' : 'bg-black/50 border-white/10'
+        }`}
+      >
         <div className='flex justify-between items-center gap-2 sm:gap-4 text-xs sm:text-base'>
           <div className='text-yellow-400 font-bold truncate'>
-            턴: <span className={`${isMyTurn && !currentPlayer.hasFinished ? 'text-yellow-300 animate-pulse' : 'text-white'}`}>
+            턴:{' '}
+            <span
+              className={`${isMyTurn && !currentPlayer.hasFinished ? 'text-yellow-300 animate-pulse' : 'text-white'}`}
+            >
               {activePlayer?.name} {isMyTurn && !currentPlayer.hasFinished && '👈'}
             </span>
           </div>
@@ -300,9 +361,7 @@ export function GameBoard({ game, room, currentPlayerId, onPlayCards, onPass, on
                   <div className='text-2xl'>{player.type === 'ai' ? '🤖' : '👤'}</div>
                   <div className='min-w-0 flex-1'>
                     <div className='text-white font-bold text-sm truncate'>{player.name}</div>
-                    {player.hasFinished && (
-                      <div className='text-yellow-400 text-xs'>🏆 {player.finishOrder}등</div>
-                    )}
+                    {player.hasFinished && <div className='text-yellow-400 text-xs'>🏆 {player.finishOrder}등</div>}
                   </div>
                 </div>
                 <div className='bg-black/30 rounded px-2 py-1 text-center'>
@@ -333,9 +392,7 @@ export function GameBoard({ game, room, currentPlayerId, onPlayCards, onPass, on
                       <div className='text-xl'>{player.type === 'ai' ? '🤖' : '👤'}</div>
                       <div>
                         <div className='text-white font-bold text-xs whitespace-nowrap'>{player.name}</div>
-                        {player.hasFinished && (
-                          <div className='text-yellow-400 text-xs'>🏆 {player.finishOrder}등</div>
-                        )}
+                        {player.hasFinished && <div className='text-yellow-400 text-xs'>🏆 {player.finishOrder}등</div>}
                       </div>
                       <div className='bg-black/30 rounded px-2 py-1 ml-2'>
                         <div className='text-yellow-400 font-bold text-xs'>🎴 {player.cards.length}</div>
@@ -353,15 +410,22 @@ export function GameBoard({ game, room, currentPlayerId, onPlayCards, onPass, on
               {/* 타이머 표시 (중앙 상단) */}
               {remainingTime !== null && (
                 <div className='flex justify-center mb-4 sm:mb-6'>
-                  <div className={`
+                  <div
+                    className={`
                     px-6 sm:px-10 py-3 sm:py-5 rounded-2xl sm:rounded-3xl text-3xl sm:text-6xl font-black
                     transition-all duration-300
-                    ${remainingTime <= 3 ? 'bg-red-600 text-white animate-pulse scale-110 animate-timer-shake' :
-                      remainingTime <= 5 ? 'bg-red-600 text-white animate-pulse scale-110' :
-                      remainingTime <= 10 ? 'bg-orange-500 text-white scale-105' :
-                      'bg-blue-600 text-white'}
+                    ${
+                      remainingTime <= 3
+                        ? 'bg-red-600 text-white animate-pulse scale-110 animate-timer-shake'
+                        : remainingTime <= 5
+                        ? 'bg-red-600 text-white animate-pulse scale-110'
+                        : remainingTime <= 10
+                        ? 'bg-orange-500 text-white scale-105'
+                        : 'bg-blue-600 text-white'
+                    }
                     shadow-2xl
-                  `}>
+                  `}
+                  >
                     ⏱️ {remainingTime}
                   </div>
                 </div>
@@ -414,9 +478,7 @@ export function GameBoard({ game, room, currentPlayerId, onPlayCards, onPass, on
                   <div className='text-2xl'>{player.type === 'ai' ? '🤖' : '👤'}</div>
                   <div className='min-w-0 flex-1'>
                     <div className='text-white font-bold text-sm truncate'>{player.name}</div>
-                    {player.hasFinished && (
-                      <div className='text-yellow-400 text-xs'>🏆 {player.finishOrder}등</div>
-                    )}
+                    {player.hasFinished && <div className='text-yellow-400 text-xs'>🏆 {player.finishOrder}등</div>}
                   </div>
                 </div>
                 <div className='bg-black/30 rounded px-2 py-1 text-center'>
@@ -429,17 +491,47 @@ export function GameBoard({ game, room, currentPlayerId, onPlayCards, onPass, on
       </div>
 
       {/* 하단 - 내 카드 및 컨트롤 */}
-      <div className={`shrink-0 backdrop-blur-md border-t transition-all duration-300 ${
-        isMyTurn && !currentPlayer.hasFinished
-          ? 'bg-yellow-500/20 border-yellow-400 shadow-[0_-4px_20px_rgba(250,204,21,0.3)]'
-          : 'bg-black/50 border-white/10'
-      }`}>
+      <div
+        className={`shrink-0 backdrop-blur-md border-t transition-all duration-300 ${
+          isMyTurn && !currentPlayer.hasFinished
+            ? 'bg-yellow-500/20 border-yellow-400 shadow-[0_-4px_20px_rgba(250,204,21,0.3)]'
+            : 'bg-black/50 border-white/10'
+        }`}
+      >
+        {/* 키보드 조작 가이드 (내 턴일 때만 표시) */}
+        {isMyTurn && !currentPlayer.hasFinished && (
+          <div className='hidden sm:flex justify-center items-center gap-6 py-1 bg-black/20 text-[10px] text-white/50 border-b border-white/5'>
+            <div className='flex items-center gap-1'>
+              <kbd className='bg-black/30 px-1.5 py-0.5 rounded border border-white/10'>←</kbd>
+              <kbd className='bg-black/30 px-1.5 py-0.5 rounded border border-white/10'>→</kbd>
+              <span>카드 이동</span>
+            </div>
+            <div className='flex items-center gap-1'>
+              <kbd className='bg-black/30 px-1.5 py-0.5 rounded border border-white/10'>Space</kbd>
+              <span>선택/취소</span>
+            </div>
+            <div className='flex items-center gap-1'>
+              <kbd className='bg-black/30 px-1.5 py-0.5 rounded border border-white/10'>Enter</kbd>
+              <span>내기</span>
+            </div>
+            <div className='flex items-center gap-1'>
+              <kbd className='bg-black/30 px-1.5 py-0.5 rounded border border-white/10'>S</kbd>
+              <span>패스</span>
+            </div>
+          </div>
+        )}
+
         {/* 내 카드 */}
-        <div className='px-2 pt-12 sm:pt-16 pb-2 overflow-x-auto overflow-y-visible border-b border-white/10'>
+        <div
+          ref={cardsContainerRef}
+          className='px-2 pt-12 sm:pt-16 pb-2 overflow-x-auto overflow-y-visible border-b border-white/10 scroll-smooth'
+        >
           <div className='flex gap-1 sm:gap-2 justify-start sm:justify-center min-w-max'>
-            {currentPlayer.cards.map((card) => {
-              // 내 턴이 아니거나 이미 끝났으면 모든 카드 비활성화
-              let playable = false;
+            {currentPlayer.cards.map((card, index) => {
+              let playable =
+                isMyTurn && !currentPlayer.hasFinished
+                  ? isCardPlayable(card, currentPlayer.cards, game.currentTurn, game.isRevolution)
+                  : true;
 
               if (isMyTurn && !currentPlayer.hasFinished) {
                 playable = isCardPlayable(card, currentPlayer.cards, game.currentTurn, game.isRevolution);
@@ -461,7 +553,11 @@ export function GameBoard({ game, room, currentPlayerId, onPlayCards, onPass, on
                   key={card.id}
                   card={card}
                   selected={selectedCards.has(card.id)}
-                  onClick={() => toggleCardSelection(card.id)}
+                  focused={index === focusedCardIndex}
+                  onClick={() => {
+                    setFocusedCardIndex(index); // 클릭 시 해당 카드로 포커스 이동
+                    toggleCardSelection(card.id);
+                  }}
                   size='large'
                   playable={playable}
                 />
@@ -472,11 +568,13 @@ export function GameBoard({ game, room, currentPlayerId, onPlayCards, onPass, on
 
         {/* 컨트롤 영역 */}
         <div className='px-2 sm:px-4 py-2 flex flex-col sm:flex-row justify-between items-center gap-2'>
-          <div className={`flex items-center gap-2 sm:gap-3 backdrop-blur-sm px-3 py-2 rounded-xl shrink-0 border-2 transition-all duration-300 ${
-            isMyTurn && !currentPlayer.hasFinished
-              ? 'bg-yellow-500/30 border-yellow-400 shadow-lg shadow-yellow-400/30 scale-105'
-              : 'bg-amber-900/80 border-transparent'
-          }`}>
+          <div
+            className={`flex items-center gap-2 sm:gap-3 backdrop-blur-sm px-3 py-2 rounded-xl shrink-0 border-2 transition-all duration-300 ${
+              isMyTurn && !currentPlayer.hasFinished
+                ? 'bg-yellow-500/30 border-yellow-400 shadow-lg shadow-yellow-400/30 scale-105'
+                : 'bg-amber-900/80 border-transparent'
+            }`}
+          >
             <div className='text-2xl sm:text-3xl'>👤</div>
             <div>
               <div className='text-yellow-400 font-bold text-sm sm:text-base'>{currentPlayer.name}</div>
@@ -508,7 +606,7 @@ export function GameBoard({ game, room, currentPlayerId, onPlayCards, onPass, on
               >
                 <span>✋ 패스</span>
                 <kbd className='hidden md:flex items-center gap-1 font-sans text-[10px] bg-black/20 px-1.5 py-0.5 rounded border-b-2 border-black/30 text-white/90 uppercase tracking-wider'>
-                  Space
+                  S
                 </kbd>
               </button>
             </div>
